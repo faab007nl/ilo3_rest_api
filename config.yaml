@@ -1,0 +1,26 @@
+---
+name: ILO Rest Api
+version: dev
+slug: ilo_rest_api
+description: ILO3 Rest Api to control and get the power and uid states
+url: https://github.com/Faab007NL
+init: false
+arch:
+  - armhf
+  - armv7
+  - aarch64
+  - amd64
+  - i386
+options:
+  API_PORT: 3547
+  ILO_HOST: null
+  ILO_PORT: 22
+  ILO_USERNAME: null
+  ILO_PASSWORD: null
+schema:
+  API_PORT: int
+  ILO_HOST: str
+  ILO_PORT: int
+  ILO_USERNAME: str
+  ILO_PASSWORD: str
+image: "ghcr.io/home-assistant/{arch}-addon-example"
