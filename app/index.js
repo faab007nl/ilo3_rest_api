@@ -1,6 +1,6 @@
 const express = require('express');
 const app = express();
-const port = 3000;
+const port = 3547;
 const { NodeSSH } = require('node-ssh');
 require('dotenv').config();
 
@@ -24,6 +24,11 @@ let uidOn = false;
 
 const startLoop = () => {
     console.log('Connecting to ILO...');
+
+    console.log('Host: ' + sshConfig.host);
+    console.log('Port: ' + sshConfig.port);
+    console.log('Username: ' + sshConfig.username);
+
     ssh.connect(sshConfig).then(() => {
         console.log('Connected to SSH');
         let waitDelay = 1500;
