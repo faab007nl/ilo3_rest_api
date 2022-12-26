@@ -7,7 +7,7 @@ require('dotenv').config();
 
 const limiter = rateLimit({
     windowMs: 1000, // 1 second
-    max: 2, // limit each IP to 5 requests per windowMs
+    max: 10, // limit each IP to 10 requests per windowMs
     standardHeaders: true,
     legacyHeaders: true,
     message: async (request, response) => {
@@ -37,6 +37,7 @@ const ssh = new NodeSSH();
 let sshConnected = false;
 let powerOn = false;
 let uidOn = false;
+let commandQueue = [];
 
 const startConnection = () => {
     console.log('Connecting to ILO...');
@@ -48,69 +49,77 @@ const startConnection = () => {
     console.log("-----------------------");
     console.log("");
 
-
     ssh.connect(sshConfig).then(() => {
         console.log('Connected to SSH');
-        let waitDelay = 1500;
-
-        ssh.execCommand('power').then((result) => {
-            let ssh_response = result.stdout;
-            let parts = ssh_response.split(":");
-            let power_state = parts[parts.length - 1].toLowerCase().trim();
-            powerOn = power_state === "on";
-        });
-
-        setTimeout(() => {
-            ssh.execCommand('uid').then((result) => {
-                let ssh_response = result.stdout;
-                let parts = ssh_response.split(":");
-                let power_state = parts[parts.length - 1].toLowerCase().trim();
-                uidOn = power_state === "on";
-            });
-        }, waitDelay);
-
         setTimeout(() => {
             sshConnected = true;
+            startQueueProcessor();
             startFetchLoop();
-        }, waitDelay * 2);
+        }, 500);
     });
+};
+
+const addCommandToQueue = (command) => {
+    let allowedCommands = ['power', 'power on', 'power off', 'uid', 'uid on', 'uid off'];
+    if (allowedCommands.includes(command)) {
+        commandQueue.push(command);
+    }
+}
+const startQueueProcessor = () => {
+    setTimeout(() => {
+        if (!sshConnected) return;
+        if (commandQueue.length > 0) {
+            let command = commandQueue.shift();
+            console.log('Processing command: ' + command);
+            ssh.execCommand(command).then((result) => {
+                processCommandResult(command, result.stdout);
+                startQueueProcessor();
+            });
+        }else{
+            startQueueProcessor();
+        }
+    }, 200);
+};
+
+const processCommandResult = (command, response) => {
+    let parts = response.split(":");
+    let power_state = parts[parts.length - 1].toLowerCase().trim();
+
+    if (command === 'power') {
+        powerOn = power_state === "on";
+    }
+    if (command === 'power on') {
+        if(response.includes("server powering on")){
+            powerOn = true;
+        }
+    }
+    if (command === 'power off') {
+        if(response.includes("server powering off")){
+            powerOn = false;
+        }
+    }
+    if (command === 'uid') {
+        uidOn = power_state === "on";
+    }
+    if (command === 'uid on') {
+        if(response.includes("command complete")){
+            uidOn = true;
+        }
+    }
+    if (command === 'uid off') {
+        if(response.includes("command complete")){
+            uidOn = false;
+        }
+    }
 };
 
 const startFetchLoop = () => {
     console.log('Starting fetch loop...');
-
-    let currentlyFetchingPowerState = false;
-    let currentlyFetchingUidState = false;
-    let waitDelay = fetchDelay;
-
     setInterval(() => {
         if (!sshConnected) return;
-
-        if(!currentlyFetchingPowerState){
-            currentlyFetchingPowerState = true;
-            ssh.execCommand('power').then((result) => {
-                let ssh_response = result.stdout;
-                let parts = ssh_response.split(":");
-                let power_state = parts[parts.length - 1].toLowerCase().trim();
-                powerOn = power_state === "on";
-                currentlyFetchingPowerState = false;
-            });
-        }
-
-        setTimeout(() => {
-            if(!currentlyFetchingUidState){
-                currentlyFetchingUidState = true;
-                ssh.execCommand('uid').then((result) => {
-                    let ssh_response = result.stdout;
-                    let parts = ssh_response.split(":");
-                    let power_state = parts[parts.length - 1].toLowerCase().trim();
-                    uidOn = power_state === "on";
-                    currentlyFetchingUidState = false;
-                });
-            }
-        }, waitDelay);
-
-    }, (waitDelay * 2) + 1000);
+        addCommandToQueue('power');
+        addCommandToQueue('uid');
+    }, (fetchDelay * 2) + 1200);
 };
 
 app.get('/', (req, res) => {
@@ -151,22 +160,11 @@ app.get('/power/on', (req, res) => {
         return;
     }
 
-    ssh.execCommand('power on').then((result) => {
-        let ssh_response = result.stdout.toLowerCase().trim();
-        if(ssh_response.includes("server power already on")){
-            res.status(409).json({
-                "message": "Already on",
-                "code": 409
-            });
-            return;
-        }
-        if(ssh_response.includes("server powering on")){
-            powerOn = true;
-            res.status(202).json({
-                'message': 'Command sent',
-                "code": 202
-            });
-        }
+    addCommandToQueue('power on');
+
+    res.status(202).json({
+        'message': 'Command added to queue',
+        "code": 202
     });
 });
 app.get('/power/off', (req, res) => {
@@ -186,22 +184,11 @@ app.get('/power/off', (req, res) => {
         return;
     }
 
-    ssh.execCommand('power off').then((result) => {
-        let ssh_response = result.stdout.toLowerCase().trim();
-        if(ssh_response.includes("server power already off")){
-            res.status(409).json({
-                "message": "Already off",
-                "code": 409
-            });
-            return;
-        }
-        if(ssh_response.includes("server powering off")){
-            powerOn = false;
-            res.status(202).json({
-                'message': 'Command sent',
-                "code": 202
-            });
-        }
+    addCommandToQueue('power off');
+
+    res.status(202).json({
+        'message': 'Command added to queue',
+        "code": 202
     });
 });
 
@@ -235,22 +222,11 @@ app.get('/uid/on', (req, res) => {
         return;
     }
 
-    ssh.execCommand('uid on').then((result) => {
-        let ssh_response = result.stdout.toLowerCase().trim();
-        if(ssh_response.includes("unit id already on")){
-            res.status(409).json({
-                "message": "Already on",
-                "code": 409
-            });
-            return;
-        }
-        if(ssh_response.includes("command complete")){
-            uidOn = true;
-            res.status(202).json({
-                'message': 'Command sent',
-                "code": 202
-            });
-        }
+    addCommandToQueue('uid on');
+
+    res.status(202).json({
+        'message': 'Command added to queue',
+        "code": 202
     });
 });
 app.get('/uid/off', (req, res) => {
@@ -270,22 +246,11 @@ app.get('/uid/off', (req, res) => {
         return;
     }
 
-    ssh.execCommand('uid off').then((result) => {
-        let ssh_response = result.stdout.toLowerCase().trim();
-        if(ssh_response.includes("unit id already off")){
-            res.status(409).json({
-                "message": "Already off",
-                "code": 409
-            });
-            return;
-        }
-        if(ssh_response.includes("command complete")){
-            uidOn = false;
-            res.status(202).json({
-                'message': 'Command sent',
-                "code": 202
-            });
-        }
+    addCommandToQueue('uid off');
+
+    res.status(202).json({
+        'message': 'Command added to queue',
+        "code": 202
     });
 });
 
