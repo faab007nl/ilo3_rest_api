@@ -1,9 +1,25 @@
 const express = require('express');
+const rateLimit = require('express-rate-limit')
 const app = express();
 const port = 3547;
 const { NodeSSH } = require('node-ssh');
 require('dotenv').config();
 
+const limiter = rateLimit({
+    windowMs: 1000, // 1 second
+    max: 2, // limit each IP to 5 requests per windowMs
+    standardHeaders: true,
+    legacyHeaders: true,
+    message: async (request, response) => {
+        return {
+            "code": 429,
+            "message": 'Too many requests, please try again later.'
+        };
+    },
+})
+app.use(limiter);
+
+let fetchDelay = process.env.FETCH_DELAY_MS || 1500;
 let sshConfig = {
     host: process.env.SSH_HOST,
     port: process.env.SSH_PORT,
@@ -22,12 +38,16 @@ let sshConnected = false;
 let powerOn = false;
 let uidOn = false;
 
-const startLoop = () => {
+const startConnection = () => {
     console.log('Connecting to ILO...');
 
+    console.log("-----------------------");
     console.log('Host: ' + sshConfig.host);
     console.log('Port: ' + sshConfig.port);
     console.log('Username: ' + sshConfig.username);
+    console.log("-----------------------");
+    console.log("");
+
 
     ssh.connect(sshConfig).then(() => {
         console.log('Connected to SSH');
@@ -44,19 +64,60 @@ const startLoop = () => {
             ssh.execCommand('uid').then((result) => {
                 let ssh_response = result.stdout;
                 let parts = ssh_response.split(":");
-                let power_state = parts[parts.length - 1];
+                let power_state = parts[parts.length - 1].toLowerCase().trim();
                 uidOn = power_state === "on";
             });
         }, waitDelay);
 
         setTimeout(() => {
             sshConnected = true;
+            startFetchLoop();
         }, waitDelay * 2);
     });
 };
 
+const startFetchLoop = () => {
+    console.log('Starting fetch loop...');
+
+    let currentlyFetchingPowerState = false;
+    let currentlyFetchingUidState = false;
+    let waitDelay = fetchDelay;
+
+    setInterval(() => {
+        if (!sshConnected) return;
+
+        if(!currentlyFetchingPowerState){
+            currentlyFetchingPowerState = true;
+            ssh.execCommand('power').then((result) => {
+                let ssh_response = result.stdout;
+                let parts = ssh_response.split(":");
+                let power_state = parts[parts.length - 1].toLowerCase().trim();
+                powerOn = power_state === "on";
+                currentlyFetchingPowerState = false;
+            });
+        }
+
+        setTimeout(() => {
+            if(!currentlyFetchingUidState){
+                currentlyFetchingUidState = true;
+                ssh.execCommand('uid').then((result) => {
+                    let ssh_response = result.stdout;
+                    let parts = ssh_response.split(":");
+                    let power_state = parts[parts.length - 1].toLowerCase().trim();
+                    uidOn = power_state === "on";
+                    currentlyFetchingUidState = false;
+                });
+            }
+        }, waitDelay);
+
+    }, (waitDelay * 2) + 1000);
+};
+
 app.get('/', (req, res) => {
-    res.send('ILO3 REST API');
+    res.status(200).json({
+        "message": "ILO Rest API up and running!",
+        "code": 200
+    });
 });
 
 app.get('/power', (req, res) => {
@@ -68,15 +129,9 @@ app.get('/power', (req, res) => {
         return;
     }
 
-    ssh.execCommand('power').then((result) => {
-        let ssh_response = result.stdout;
-        let parts = ssh_response.split(":");
-        let power_state = parts[parts.length - 1].toLowerCase().trim();
-
-        powerOn = power_state === "on";
-        res.status(200).json({
-            "powered_on": power_state === "on"
-        });
+    res.status(200).json({
+        "powered_on": powerOn,
+        "code": 200
     });
 });
 app.get('/power/on', (req, res) => {
@@ -97,15 +152,15 @@ app.get('/power/on', (req, res) => {
     }
 
     ssh.execCommand('power on').then((result) => {
-        let ssh_response = result.stdout;
-        if(ssh_response.includes("Server power already on")){
+        let ssh_response = result.stdout.toLowerCase().trim();
+        if(ssh_response.includes("server power already on")){
             res.status(409).json({
                 "message": "Already on",
                 "code": 409
             });
             return;
         }
-        if(ssh_response.includes("Server powering on")){
+        if(ssh_response.includes("server powering on")){
             powerOn = true;
             res.status(202).json({
                 'message': 'Command sent',
@@ -132,15 +187,15 @@ app.get('/power/off', (req, res) => {
     }
 
     ssh.execCommand('power off').then((result) => {
-        let ssh_response = result.stdout;
-        if(ssh_response.includes("Server power already off")){
+        let ssh_response = result.stdout.toLowerCase().trim();
+        if(ssh_response.includes("server power already off")){
             res.status(409).json({
                 "message": "Already off",
                 "code": 409
             });
             return;
         }
-        if(ssh_response.includes("Server powering off")){
+        if(ssh_response.includes("server powering off")){
             powerOn = false;
             res.status(202).json({
                 'message': 'Command sent',
@@ -158,16 +213,9 @@ app.get('/uid', (req, res) => {
         });
         return;
     }
-
-    ssh.execCommand('uid').then((result) => {
-        let ssh_response = result.stdout;
-        let parts = ssh_response.split(":");
-        let power_state = parts[parts.length - 1].toLowerCase().trim();
-
-        uidOn = power_state === "on";
-        res.status(200).json({
-            "powered_on": power_state === "on"
-        });
+    res.status(200).json({
+        "powered_on": uidOn,
+        "code": 200
     });
 });
 app.get('/uid/on', (req, res) => {
@@ -188,15 +236,15 @@ app.get('/uid/on', (req, res) => {
     }
 
     ssh.execCommand('uid on').then((result) => {
-        let ssh_response = result.stdout;
-        if(ssh_response.includes("Unit Id already on")){
+        let ssh_response = result.stdout.toLowerCase().trim();
+        if(ssh_response.includes("unit id already on")){
             res.status(409).json({
                 "message": "Already on",
                 "code": 409
             });
             return;
         }
-        if(ssh_response.includes("COMMAND COMPLETE")){
+        if(ssh_response.includes("command complete")){
             uidOn = true;
             res.status(202).json({
                 'message': 'Command sent',
@@ -223,15 +271,15 @@ app.get('/uid/off', (req, res) => {
     }
 
     ssh.execCommand('uid off').then((result) => {
-        let ssh_response = result.stdout;
-        if(ssh_response.includes("Unit Id already off")){
+        let ssh_response = result.stdout.toLowerCase().trim();
+        if(ssh_response.includes("unit id already off")){
             res.status(409).json({
                 "message": "Already off",
                 "code": 409
             });
             return;
         }
-        if(ssh_response.includes("COMMAND COMPLETE")){
+        if(ssh_response.includes("command complete")){
             uidOn = false;
             res.status(202).json({
                 'message': 'Command sent',
@@ -243,5 +291,5 @@ app.get('/uid/off', (req, res) => {
 
 app.listen(port, () => {
     console.log(`ILO3 REST API listening on port ${port}`);
-    startLoop();
+    startConnection();
 });

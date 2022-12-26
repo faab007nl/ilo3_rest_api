@@ -20,8 +20,10 @@ options:
   SSH_PORT: 22
   SSH_USERNAME: null
   SSH_PASSWORD: null
+  FETCH_DELAY_MS: 1500
 schema:
   SSH_HOST: str
   SSH_PORT: int
   SSH_USERNAME: str
   SSH_PASSWORD: str
+  FETCH_DELAY_MS: int
