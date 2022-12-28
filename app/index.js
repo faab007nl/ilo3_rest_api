@@ -41,7 +41,7 @@ let commandQueue = [];
 let firstStartupComplete = false;
 
 const init = () => {
-    startQueueProcessor();
+    initQueueProcessor();
     startFetchLoop();
     connect();
 }
@@ -73,8 +73,13 @@ const addCommandToQueue = (command) => {
         commandQueue.push(command);
     }
 }
-const startQueueProcessor = () => {
+
+const initQueueProcessor = () => {
     console.log('Starting queue processor...');
+    startQueueProcessor();
+};
+
+const startQueueProcessor = () => {
     setTimeout(() => {
         if (commandQueue.length > 0) {
             if (!sshConnected) {
