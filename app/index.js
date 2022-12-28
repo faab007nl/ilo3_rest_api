@@ -76,14 +76,17 @@ const addCommandToQueue = (command) => {
 const startQueueProcessor = () => {
     console.log('Starting queue processor...');
     setTimeout(() => {
-        if (!sshConnected) {
-            if (firstStartupComplete) {
-                console.log('SSH connection lost, reconnecting...');
-                connect();
-            }
-            return;
-        }
         if (commandQueue.length > 0) {
+            if (!sshConnected) {
+                if (firstStartupComplete) {
+                    console.log('SSH connection lost, reconnecting...');
+                    connect();
+                }else{
+                    console.log('SSH not connected, retrying...');
+                }
+                return;
+            }
+
             let command = commandQueue.shift();
             console.log('Processing command: ' + command);
             ssh.execCommand(command).then((result) => {
