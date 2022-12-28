@@ -66,11 +66,6 @@ const connect = () => {
             }
         }, 500);
     });
-    ssh.ondisconnect(() => {
-        console.log('SSH disconnected');
-        sshConnected = false;
-        connect();
-    });
 };
 
 const addCommandToQueue = (command) => {
