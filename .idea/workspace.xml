@@ -4,8 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="3e4c8502-547e-47a5-a3d3-742e57826764" name="Changes" comment="Made api use a queue to send the commands to the server">
-      <change beforePath="$PROJECT_DIR$/config.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/config.yaml" afterDir="false" />
+    <list default="true" id="3e4c8502-547e-47a5-a3d3-742e57826764" name="Changes" comment="Updated version">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/app/index.js" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -75,7 +76,9 @@
       <workItem from="1671998342964" duration="9000" />
       <workItem from="1672068680532" duration="2021000" />
       <workItem from="1672070996667" duration="70000" />
-      <workItem from="1672072510602" duration="1321000" />
+      <workItem from="1672072510602" duration="1334000" />
+      <workItem from="1672077026053" duration="2000" />
+      <workItem from="1672251119788" duration="229000" />
     </task>
     <task id="LOCAL-00001" summary="Made node fetch the status on a interval">
       <created>1672070691604</created>
@@ -98,7 +101,14 @@
       <option name="project" value="LOCAL" />
       <updated>1672073831007</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="Updated version">
+      <created>1672073857524</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1672073857524</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -109,6 +119,7 @@
     <MESSAGE value="Made node fetch the status on a interval" />
     <MESSAGE value="Delete node_modules folder" />
     <MESSAGE value="Made api use a queue to send the commands to the server" />
-    <option name="LAST_COMMIT_MESSAGE" value="Made api use a queue to send the commands to the server" />
+    <MESSAGE value="Updated version" />
+    <option name="LAST_COMMIT_MESSAGE" value="Updated version" />
   </component>
 </project>

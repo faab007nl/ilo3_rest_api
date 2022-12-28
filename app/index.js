@@ -38,8 +38,16 @@ let sshConnected = false;
 let powerOn = false;
 let uidOn = false;
 let commandQueue = [];
+let firstStartupComplete = false;
 
-const startConnection = () => {
+
+const init = () => {
+    startQueueProcessor();
+    startFetchLoop();
+    connect();
+}
+
+const connect = () => {
     console.log('Connecting to ILO...');
 
     console.log("-----------------------");
@@ -53,9 +61,15 @@ const startConnection = () => {
         console.log('Connected to SSH');
         setTimeout(() => {
             sshConnected = true;
-            startQueueProcessor();
-            startFetchLoop();
+            if (!firstStartupComplete){
+                firstStartupComplete = true;
+            }
         }, 500);
+    });
+    ssh.ondisconnect(() => {
+        console.log('SSH disconnected');
+        sshConnected = false;
+        connect();
     });
 };
 
@@ -67,7 +81,13 @@ const addCommandToQueue = (command) => {
 }
 const startQueueProcessor = () => {
     setTimeout(() => {
-        if (!sshConnected) return;
+        if (!sshConnected) {
+            if (firstStartupComplete) {
+                console.log('SSH connection lost, reconnecting...');
+                connect();
+            }
+            return;
+        }
         if (commandQueue.length > 0) {
             let command = commandQueue.shift();
             console.log('Processing command: ' + command);
@@ -256,5 +276,5 @@ app.get('/uid/off', (req, res) => {
 
 app.listen(port, () => {
     console.log(`ILO3 REST API listening on port ${port}`);
-    startConnection();
+    init();
 });
