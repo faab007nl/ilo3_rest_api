@@ -40,7 +40,6 @@ let uidOn = false;
 let commandQueue = [];
 let firstStartupComplete = false;
 
-
 const init = () => {
     startQueueProcessor();
     startFetchLoop();
@@ -75,6 +74,7 @@ const addCommandToQueue = (command) => {
     }
 }
 const startQueueProcessor = () => {
+    console.log('Starting queue processor...');
     setTimeout(() => {
         if (!sshConnected) {
             if (firstStartupComplete) {
