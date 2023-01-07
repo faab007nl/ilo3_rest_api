@@ -38,7 +38,6 @@ let sshConnected = false;
 let powerOn = false;
 let uidOn = false;
 let commandQueue = [];
-let firstStartupComplete = false;
 
 const init = () => {
     initQueueProcessor();
@@ -60,12 +59,26 @@ const connect = () => {
         console.log('Connected to SSH');
         setTimeout(() => {
             sshConnected = true;
-            if (!firstStartupComplete){
-                firstStartupComplete = true;
-            }
         }, 500);
+
+        setTimeout(() => {
+            console.log('Disconnecting from SSH');
+            ssh.disconnect();
+            setTimeout(() => {
+                connect();
+            }, 500);
+        }, 1000 * 60 * 5);
+
     });
 };
+
+const autoReconnect = () => {
+    console.log('Disconnecting from SSH');
+    ssh.disconnect();
+    setTimeout(() => {
+        connect();
+    }, 500);
+}
 
 const addCommandToQueue = (command) => {
     let allowedCommands = ['power', 'power on', 'power off', 'uid', 'uid on', 'uid off'];
@@ -82,20 +95,18 @@ const initQueueProcessor = () => {
 const startQueueProcessor = () => {
     setTimeout(() => {
         if (commandQueue.length > 0) {
-            if (!sshConnected) {
-                if (firstStartupComplete) {
-                    console.log('SSH connection lost, reconnecting...');
-                    connect();
-                }else{
-                    console.log('SSH not connected, retrying...');
-                }
-                return;
-            }
+            if (!sshConnected) return;
 
             let command = commandQueue.shift();
             console.log('Processing command: ' + command);
             ssh.execCommand(command).then((result) => {
                 processCommandResult(command, result.stdout);
+
+                console.log('----------Command result----------');
+                console.log(result.stdout);
+                console.log('----------------------------------');
+                console.log('');
+
                 startQueueProcessor();
             });
         }else{
